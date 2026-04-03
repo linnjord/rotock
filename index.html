@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rotock Pokédex</title>
+  <style>
+    :root {
+      --bg: #eef0f3;
+      --card-bg: #ffffff;
+      --accent: #e63946;
+      --text: #1a1a1a;
+      --muted: #888888;
+      --border: rgba(0,0,0,0.08);
+      --legendary: #c9952a;
+      --mythical: #8b3fd4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #1e3d6b 0%, #0d2440 100%);
+      padding: 18px 32px;
+      display: flex; align-items: center; gap: 18px;
+      position: relative; z-index: 1;
+      box-shadow: 0 4px 16px rgba(13,36,64,0.35);
+    }
+    .logo {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: white; flex-shrink: 0;
+      position: relative; overflow: hidden;
+      border: 3px solid rgba(255,255,255,0.8);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    .logo::before { content:''; position:absolute; top:0;left:0;right:0; height:50%; background:#1e3d6b; }
+    .logo::after {
+      content:''; position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:13px; height:13px; background:white;
+      border-radius:50%; border:3px solid #333; z-index:1;
+    }
+    header h1 { font-size:1.7rem; font-weight:800; color:white; letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,0.2); }
+    header p { font-size:0.82rem; color:rgba(255,255,255,0.82); margin-top:2px; }
+
+    /* ── SEARCH & FILTER ── */
+    .controls {
+      max-width: 980px; margin: 22px auto 0; padding: 0 18px;
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .controls input {
+      width: 100%; padding: 12px 20px; border-radius: 50px;
+      border: 2px solid rgba(230,57,70,0.2); background: white;
+      color: var(--text); font-size: 1rem; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .controls input:focus { border-color: rgba(230,57,70,0.5); box-shadow: 0 0 12px rgba(230,57,70,0.1); }
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 7px 16px; border-radius: 50px; border: 2px solid var(--border);
+      background: white; color: var(--muted); font-size: 0.82rem; font-weight: 700;
+      cursor: pointer; transition: all 0.15s; letter-spacing: 0.3px;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .filter-btn.legendary-btn.active { background: var(--legendary); border-color: var(--legendary); }
+    .filter-btn.mythical-btn.active  { background: var(--mythical); border-color: var(--mythical); }
+
+    /* ── GRID ── */
+    #pokedex-view {
+      max-width: 980px; margin: 20px auto 80px; padding: 0 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+      gap: 14px; position: relative; z-index: 1;
+    }
+    .poke-card {
+      background: white; border-radius: 16px;
+      padding: 16px 10px 12px; cursor: pointer; text-align: center;
+      border: 2px solid var(--border); position: relative; overflow: hidden;
+      transition: transform 0.16s, box-shadow 0.16s;
+    }
+    .poke-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(0,0,0,0.11); border-color: rgba(230,57,70,0.25); }
+    .poke-card.is-legendary { border-color: rgba(201,149,42,0.35); }
+    .poke-card.is-legendary:hover { border-color: var(--legendary); box-shadow: 0 10px 28px rgba(201,149,42,0.2); }
+    .poke-card.is-mythical  { border-color: rgba(139,63,212,0.35); }
+    .poke-card.is-mythical:hover  { border-color: var(--mythical); box-shadow: 0 10px 28px rgba(139,63,212,0.2); }
+
+    /* Corner badge */
+    .corner-badge {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 0.78rem; line-height: 1;
+    }
+    .poke-card .num { font-size: 0.7rem; color: var(--muted); font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; }
+    .poke-card img { width: 90px; height: 90px; object-fit: contain; }
+    .placeholder-img {
+      width: 90px; height: 90px; margin: 0 auto;
+      background: #f0f0f0; border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #bbb; font-size: 1.4rem; gap: 2px;
+    }
+    .placeholder-img span { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.5px; color: #ccc; }
+    .poke-card h3 { font-size: 0.88rem; font-weight: 700; margin: 8px 0 6px; }
+    .types { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+    .type-badge {
+      font-size: 0.64rem; font-weight: 700; padding: 2px 9px;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; color: white;
+    }
+
+    /* ── DETAIL VIEW ── */
+    #detail-view {
+      display: none; max-width: 700px;
+      margin: 32px auto 80px; padding: 0 18px;
+      position: relative; z-index: 1;
+    }
+    .back-btn {
+      background: none; border: 1px solid var(--border); color: var(--text);
+      padding: 7px 18px; border-radius: 50px; cursor: pointer; font-size: 0.88rem;
+      margin-bottom: 18px; transition: all 0.2s;
+    }
+    .back-btn:hover { border-color: rgba(230,57,70,0.4); background: rgba(230,57,70,0.05); color: var(--accent); }
+    .detail-card {
+      background: white; border-radius: 22px; overflow: hidden;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.09); border: 1px solid var(--border);
+    }
+    .detail-card.is-legendary { border-color: rgba(201,149,42,0.4); box-shadow: 0 6px 30px rgba(201,149,42,0.15); }
+    .detail-card.is-mythical  { border-color: rgba(139,63,212,0.4); box-shadow: 0 6px 30px rgba(139,63,212,0.15); }
+
+    /* Header image area */
+    .detail-header { display: flex; flex-direction: column; align-items: center; background: white; }
+    .detail-img-wrap {
+      width: 100%; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; padding: 16px 12px 6px;
+    }
+    .detail-img-wrap img { width: 96%; max-width: 460px; height: auto; aspect-ratio: 1; object-fit: contain; display: block; }
+    .detail-img-wrap .placeholder-img { width: 260px; height: 260px; font-size: 3rem; border-radius: 20px; }
+    .detail-img-wrap .placeholder-img span { font-size: 1rem; }
+
+    /* Day/Night toggle */
+    .form-toggle { display: flex; gap: 8px; margin-top: 10px; }
+    .form-btn {
+      padding: 6px 16px; border-radius: 50px; border: 2px solid var(--border);
+      background: white; color: var(--muted); font-size: 0.8rem; font-weight: 700;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .form-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+    /* Detail info */
+    .detail-info { width: 100%; text-align: center; padding: 8px 28px 18px; border-bottom: 1px solid var(--border); }
+    .special-label {
+      display: inline-block; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px;
+      text-transform: uppercase; padding: 3px 12px; border-radius: 20px; margin-bottom: 6px;
+    }
+    .special-label.legendary { background: rgba(201,149,42,0.12); color: var(--legendary); }
+    .special-label.mythical  { background: rgba(139,63,212,0.12); color: var(--mythical); }
+    .detail-info .num { font-size: 0.78rem; color: var(--accent); font-weight: 700; letter-spacing: 1.5px; margin-bottom: 2px; }
+    .detail-info h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 10px; }
+    .detail-info .types { justify-content: center; }
+    .detail-info .types .type-badge { font-size: 0.76rem; padding: 4px 14px; }
+
+    /* ── TABS ── */
+    .tab-bar {
+      display: flex; border-bottom: 2px solid var(--border);
+      padding: 0 28px; background: white;
+    }
+    .tab-btn {
+      padding: 13px 18px; font-size: 0.86rem; font-weight: 700; color: var(--muted);
+      background: none; border: none; border-bottom: 3px solid transparent;
+      margin-bottom: -2px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; padding: 24px 32px 32px; animation: fadeIn 0.15s ease; }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+
+    /* Info tab */
+    .desc-box {
+      background: #fafafa; border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 18px; font-size: 0.93rem; line-height: 1.7; color: var(--text);
+    }
+    .desc-box.placeholder { color: var(--muted); font-style: italic; }
+
+    /* Moves tab */
+    .placeholder-row {
+      background: #fafafa; border: 1px dashed rgba(0,0,0,0.12); border-radius: 10px;
+      padding: 16px; text-align: center; color: var(--muted); font-style: italic; font-size: 0.88rem;
+    }
+    .move-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fafafa; border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
+    }
+    .move-row .move-name { font-weight: 700; font-size: 0.88rem; }
+    .move-row .move-meta { display: flex; align-items: center; gap: 8px; }
+    .move-row .move-pp { font-size: 0.72rem; color: var(--muted); font-weight: 600; }
+
+    /* Evolution tab */
+    #d-evo-chain { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .evo-row { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .evo-arrow { font-size: 1.2rem; color: var(--muted); margin: 0 4px; flex-shrink: 0; }
+    .evo-mon {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      cursor: pointer; padding: 10px; border-radius: 12px;
+      transition: all 0.15s; border: 1px solid transparent;
+    }
+    .evo-mon:hover { background: rgba(0,0,0,0.03); border-color: var(--border); }
+    .evo-mon.current { border-color: rgba(230,57,70,0.35); background: rgba(230,57,70,0.05); }
+    .evo-mon img { width: 62px; height: 62px; object-fit: contain; }
+    .evo-mon .placeholder-img { width: 62px; height: 62px; font-size: 1rem; border-radius: 8px; }
+    .evo-mon .placeholder-img span { display: none; }
+    .evo-mon span.name { font-size: 0.75rem; font-weight: 600; }
+    .no-evo { color: var(--muted); font-style: italic; font-size: 0.9rem; }
+
+    /* No results */
+    .no-results {
+      grid-column: 1/-1; text-align: center; color: var(--muted);
+      padding: 60px 20px; font-size: 1rem;
+    }
+
+    /* Type colours */
+    .t-grass    { background: #3d7a28; }
+    .t-fire     { background: #c94010; }
+    .t-water    { background: #2e5fa3; }
+    .t-dark     { background: #3d2e5e; }
+    .t-normal   { background: #707070; }
+    .t-electric { background: #d4a800; }
+    .t-ice      { background: #2e8a96; }
+    .t-fighting { background: #982020; }
+    .t-poison   { background: #6a2080; }
+    .t-ground   { background: #8a5820; }
+    .t-flying   { background: #4050a0; }
+    .t-psychic  { background: #a01860; }
+    .t-bug      { background: #5a7018; }
+    .t-ghost    { background: #3a2080; }
+    .t-dragon   { background: #3428b0; }
+    .t-steel    { background: #506070; }
+    .t-fairy    { background: #a06090; }
+    .t-stone    { background: #7a6840; }
+    .t-rock     { background: #706030; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 600px) {
+      header { padding: 12px 14px; gap: 12px; }
+      header h1 { font-size: 1.3rem; }
+      .logo { width: 40px; height: 40px; }
+      .controls { margin-top: 14px; }
+      #pokedex-view { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+      .poke-card img, .poke-card .placeholder-img { width: 76px; height: 76px; }
+      .tab-bar { padding: 0 12px; }
+      .tab-btn { padding: 11px 12px; font-size: 0.8rem; }
+      .tab-panel { padding: 18px 18px 28px; }
+      .detail-info h2 { font-size: 1.8rem; }
+      .detail-info { padding: 6px 18px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo"></div>
+  <div>
+    <h1>Rotock Pokédex</h1>
+    <p id="poke-count"></p>
+  </div>
+</header>
+
+<div class="controls" id="controls-section">
+  <input type="text" id="search-input" placeholder="Søk etter navn eller type..." oninput="applyFilters()" />
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all',this)">Alle</button>
+    <button class="filter-btn legendary-btn" onclick="setFilter('legendary',this)">Legendary</button>
+    <button class="filter-btn mythical-btn" onclick="setFilter('mythical',this)">Mythical</button>
+  </div>
+</div>
+
+<div id="pokedex-view"></div>
+
+<div id="detail-view">
+  <button class="back-btn" onclick="showList()">← Tilbake til Pokédex</button>
+  <div class="detail-card" id="detail-card">
+    <div class="detail-header">
+      <div class="detail-img-wrap" id="d-img-wrap"></div>
+      <div class="detail-info">
+        <div id="d-special-label"></div>
+        <div class="num" id="d-num"></div>
+        <h2 id="d-name"></h2>
+        <div class="types" id="d-types"></div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('info')">Info</button>
+      <button class="tab-btn" onclick="switchTab('evolution')">Evolusjon</button>
+      <button class="tab-btn" onclick="switchTab('moves')">Moves</button>
+    </div>
+    <div class="tab-panel active" id="tab-info">
+      <div class="desc-box" id="d-desc"></div>
+    </div>
+    <div class="tab-panel" id="tab-evolution">
+      <div id="d-evo-chain"></div>
+    </div>
+    <div class="tab-panel" id="tab-moves">
+      <div id="d-moves"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────
+//  HELPER — lag Pokémon-objekt med standardverdier
+// ─────────────────────────────────────────────────────
+function p(id, name, type1, type2, imgFile, evolvesFrom, legendary, mythical, inRegion, description, forms) {
+  return {
+    id, name,
+    type1: type1 || null,
+    type2: type2 || null,
+    img: imgFile ? 'Rotock/' + imgFile : null,
+    evolvesFrom: evolvesFrom || null,
+    legendary: !!legendary,
+    mythical: !!mythical,
+    inRegion: inRegion !== false,
+    description: description || null,
+    moves: [],
+    forms: forms || null
+  };
+}
+
+// ─────────────────────────────────────────────────────
+//  POKEMON DATA — legg til nye her!
+// ─────────────────────────────────────────────────────
+const pokemon = [
+  p(1,  'Lelf',        'Grass',    null,       '001.PNG'),
+  p(2,  'Wolick',      'Grass',    null,       '002.PNG', 1),
+  p(3,  'Trolwf',      'Grass',    'Dark',     '003.PNG', 2),
+  p(4,  'Flampion',    'Fire',     null,       '004.PNG'),
+  p(5,  'Cracouna',    'Fire',     null,       '005.PNG', 4),
+  p(6,  'Moros',       'Fire',     'Rock',    '006.PNG', 5),
+  p(7,  'Pacua',       'Water',    null,       '007.jpg'),
+  p(8,  'Wapup',       'Water',    null,       '008.jpg', 7),
+  p(9,  'Flyke',       'Water',    'Flying',   '009.jpg', 8),
+  p(10, 'Stant',       'Ground',   'Steel',    '010.PNG'),
+  p(11, 'Kutosati',    'Ground',   'Steel',    '011.PNG', 10),
+  p(12, 'Sturtle',     'Steel',    'Normal',   '012.PNG'),
+  p(13, 'Iroskjell',   'Steel',    'Normal',   '013.PNG', 12),
+  p(14, 'Riatur',      'Flying',   null,       '014.PNG'),
+  p(15, 'Furing',      'Flying',   null,       '015.PNG', 14),
+  p(16, 'Aduoru',      'Flying',   'Fighting', '016.PNG', 15),
+  p(17, 'Mejonk',      'Psychic',  'Bug',      '017.PNG'),
+  p(18, 'Irilla',      'Psychic',  'Bug',      '018.PNG', 17),
+  p(19, 'Drageon',     'Dragon',   null,       '019.PNG', 98),
+  p(20, 'Fighteon',    'Fighting', null,       '020.PNG', 98),
+  p(21, 'Gower',       'Grass',    null,       '021.PNG'),
+  p(22, 'Trehp',       'Grass',    'Bug',      '022.PNG', 21),
+  p(23, 'Firt',        'Fire',     null,       '023.PNG'),
+  p(24, 'Octolame',    'Fire',     'Fighting', '024.PNG', 23),
+  p(25, 'Woala',       'Water',    null,       '025.PNG'),
+  p(26, 'Aquat',       'Water',    'Ice',      '026.PNG', 25),
+  p(27, 'Elepup',      'Electric', null,       '027.PNG'),
+  p(28, 'Liothing',    'Electric', null,       '028_Day.PNG', 27, 0,0,true, null,
+    [{label:'☀️ Dag', img:'Rotock/028_Day.PNG'}, {label:'🌙 Natt', img:'Rotock/028_Night.PNG'}]),
+  p(29, 'Stowlf',      'Rock',    'Dark',     '029.PNG'),
+  p(30, 'Scese',       'Ice',      'Fairy',    '030.PNG', 29),
+  p(31, 'Jayse',       'Ice',      null,       '031.PNG'),
+  p(32, 'Deark',       'Dark',     null,       '032.PNG'),
+  p(33, 'Dragonian',   'Dragon',   'Flying',   '033.PNG'),
+  p(34, 'Sarnaho',     'Steel',    'Fighting', '034.PNG'),
+  p(35, 'Sirnamon',    'Steel',    'Fighting', '035.PNG'),
+  p(36, 'Sleaf',       'Grass',    null,       '036.PNG'),
+  p(37, 'Sifing',      'Grass',    'Ghost',    '037.PNG', 36),
+  p(38, 'Thunepup',    'Electric', null,       '038.PNG'),
+  p(39, 'Thunvel',     'Electric', null,       '039.PNG', 38),
+  p(40, 'Spoche',      'Ice',      'Dark',     '040.PNG'),
+  p(41, 'Skuter',      'Water',    'Steel',    '041.PNG'),
+  p(42, 'Dekruet',     'Bug',      null,       '042.PNG'),
+  p(43, 'Kuroti',      'Bug',      null,       '043.PNG', 42),
+  p(44, 'Unkarni',     'Bug',      'Fighting', '044.PNG', 43),
+  p(45, 'Ploushe',     'Fairy',    'Normal',   '045.PNG'),
+  p(46, 'Unamast',     'Fairy',    'Normal',   '046_Day.PNG', 45, 0,0,true, null,
+    [{label:'☀️ Dag', img:'Rotock/046_Day.PNG'}, {label:'🌙 Natt', img:'Rotock/046_Night.PNG'}]),
+  p(47, 'Fairesilumy', 'Fairy',    'Flying',   '047.PNG'),
+  p(48, 'Ynmyns',      'Fighting', 'Rock',    '048.PNG'),
+  p(49, 'Woudy',       'Flying',   'Fairy',    '049.PNG'),
+  p(50, 'Moriys',      'Flying',   'Fairy',    '050.PNG', 49),
+  p(51, 'Dabitt',      'Dark',     null,       '051.PNG'),
+  p(52, 'Goion',       'Dark',     null,       '052.PNG', 51),
+  p(53, 'Soud',        'Rock',    'Dragon',   '053.PNG'),
+  p(54, 'Eabra',       'Rock',    'Dragon',   '054.PNG', 53),
+  p(55, 'Dragealy',    'Dragon',   null,       '055.PNG'),
+  p(56, 'Eagleyon',    'Dragon',   'Flying',   '056.PNG', 55),
+  p(57, 'Bygeng',      'Bug',      null,       '057.PNG'),
+  p(58, 'Bygred',      'Bug',      null,       '058.PNG', 57),
+  p(59, 'Bugdama',     'Bug',      'Flying',   '059.PNG', 58),
+  p(60, 'Walash',      'Water',    null,       '060.PNG'),
+  p(61, 'Pili',        'Poison',   null,       '061.PNG'),
+  p(62, 'Powl',        'Poison',   null,       '062.PNG', 61),
+  p(63, 'Owlolw',      'Poison',   'Dragon',   '063.PNG', 62),
+  p(64, 'Gorchest',    'Ghost',    null,       '064.PNG'),
+  p(65, 'Mrolidon',    'Ghost',    null,       '065.PNG', 64),
+  p(66, 'Dragolog',    'Ghost',    'Dragon',   '066.PNG', 65),
+  p(67, 'Drhost',      'Dark',     null,       '067.PNG'),
+  p(68, 'Shomany',     'Dark',     null,       '068.PNG', 67),
+  p(69, 'Hiyaging',    'Dark',     'Dragon',   '069.PNG', 68),
+  p(70, 'Grolish',     'Ghost',    null,       '070.PNG'),
+  p(71, 'Krokle',      'Ghost',    null,       '071.PNG', 70),
+  p(72, 'Koolimy',     'Ghost',    null,       '072.PNG', 71),
+  p(73, 'Thunet',      'Electric', null,       '073.PNG'),
+  p(74, 'Grankyni',    'Grass',    'Normal',   '074.PNG', null,0,0,true,'Gress-orangutang'),
+  p(75, 'Oravory',     'Grass',    'Normal',   '075.PNG', 74, 0,0,true,'Gress-orangutang'),
+  p(76, 'Gjat',        'Ghost',    null,       '076.PNG', null,0,0,true,'Lilla skjelett-hund'),
+  p(77, 'Gholion',     'Ghost',    null,       '077.PNG', 76, 0,0,true,'Stor lilla skjelett-hund'),
+  p(78, 'Whaling',     null,       null,       '078.PNG', null,0,0,true,'Fighting-hai'),
+  p(79, 'Pcying',      'Psychic',  'Flying',   '079.PNG', null,0,0,true,'Lilla ugle'),
+  p(80, 'Boomseny',    'Grass',    'Bug',      '080.PNG', null,0,0,true,'Stor mose-monster'),
+  p(81, 'Flamat',      'Fire',     null,       '081.PNG', null,0,0,true,'Rød løve'),
+  p(82, 'Fergir',      'Fire',     null,       '082.PNG', 81, 0,0,true,'Rød løve'),
+  p(83, 'Flion',       'Fire',     null,       '083.PNG', 82, 0,0,true,'Rød løve'),
+  p(84, 'Florag',      'Bug',      'Fairy',    '084.PNG', null,0,0,true,'Rosa marihøne'),
+  p(85, 'Muriglace',   'Ice',      'Normal',   '085.PNG', null,0,0,true,'Hvit is-mus'),
+  p(86, 'Glacimur',    'Ice',      'Normal',   '086.PNG', 85, 0,0,true,'Hvit is-bjørn'),
+  p(87, 'Glaceursia',  'Ice',      'Normal',   '087.PNG', 86, 0,0,true,'Isbre-bjørn'),
+  p(88, 'Gholizz',     'Ghost',    'Bug',      '088.PNG', null,0,0,true,'Spøkelses-kameleon'),
+  p(89, 'Dalphant',    'Dark',     'Normal',   '089.PNG', null,0,0,true,'Sort elefant med røde øyne'),
+  p(90, 'Vulpup',      'Electric', null,       '090.PNG', null,0,0,true,'Gul rev'),
+  p(91, 'Vulzap',      'Electric', null,       '091.PNG', 90, 0,0,true,'Gul rev'),
+  p(92, 'Legendary TBD','Steel',   null,       null,      null,true,false),
+  p(93, 'Legendary TBD','Steel',   null,       null,      null,true,false),
+  p(94, 'Winvolt',     'Electric', null,       '094.PNG', null,true,false,true,'Gul ørn'),
+  p(95, 'Fosswa',      'Water',    null,       '095.PNG', null,false,true,true,'Blå sjiraff'),
+  p(96, 'Illa',        'Fire',     null,       '096.PNG', null,false,true,true,'Oransje sjiraff'),
+  p(97, 'Storma',      'Electric', null,       '097.PNG', null,false,true,true,'Gul sjiraff'),
+  // #98 Eevee — ikke i regionen, men med i evolusjonskjeder
+  p(98, 'Eevee',       'Normal',   null,       null,      null,false,false,false),
+];
+
+// ─────────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────────
+let activeFilter = 'all';
+
+function typeClass(t) { return t ? 't-' + t.toLowerCase().trim() : ''; }
+function typeBadge(t) {
+  if (!t || !t.trim()) return '';
+  const clean = t.trim();
+  return `<span class="type-badge ${typeClass(clean)}">${clean}</span>`;
+}
+function padId(n) { return '#' + String(n).padStart(3, '0'); }
+
+function imgOrPlaceholder(mon, cls='') {
+  if (mon.img) return `<img src="${mon.img}" alt="${mon.name}" loading="lazy" class="${cls}" />`;
+  return `<div class="placeholder-img ${cls}">?<span>${padId(mon.id)}</span></div>`;
+}
+
+// Build evolution chain as array-of-stages (handles branching)
+function getEvoStages(mon) {
+  // Walk back to root
+  let cur = mon;
+  const seen = new Set();
+  while (cur.evolvesFrom && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    const parent = pokemon.find(p => p.id === cur.evolvesFrom);
+    if (!parent) break;
+    cur = parent;
+  }
+  // Walk forward, collecting stages
+  const stages = [];
+  function addStage(ids) {
+    stages.push(ids);
+    const nextIds = pokemon.filter(p => ids.includes(p.evolvesFrom)).map(p => p.id);
+    if (nextIds.length > 0) addStage(nextIds);
+  }
+  addStage([cur.id]);
+  return stages;
+}
+
+// ─────────────────────────────────────────────────────
+//  RENDER GRID
+// ─────────────────────────────────────────────────────
+function renderGrid(list) {
+  const grid = document.getElementById('pokedex-view');
+  const visible = list.filter(p => p.inRegion);
+  if (visible.length === 0) {
+    grid.innerHTML = '<div class="no-results">Ingen Pokémon funnet 🔍</div>';
+    return;
+  }
+  grid.innerHTML = visible.map(mon => {
+    const badge = mon.legendary ? 'LEG' : mon.mythical ? 'MYT' : '';
+    const cls   = mon.legendary ? 'is-legendary' : mon.mythical ? 'is-mythical' : '';
+    const imgEl = mon.img
+      ? `<img src="${mon.img}" alt="${mon.name}" loading="lazy" width="90" height="90" style="object-fit:contain" />`
+      : `<div class="placeholder-img" style="width:90px;height:90px">?<span>${padId(mon.id)}</span></div>`;
+    return `
+      <div class="poke-card ${cls}" onclick="showDetail(${mon.id})">
+        ${badge ? `<div class="corner-badge">${badge}</div>` : ''}
+        <div class="num">${padId(mon.id)}</div>
+        ${imgEl}
+        <h3>${mon.name}</h3>
+        <div class="types">${typeBadge(mon.type1)}${typeBadge(mon.type2)}</div>
+      </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────
+//  FILTER & SEARCH
+// ─────────────────────────────────────────────────────
+function setFilter(filter, btn) {
+  // Klikk på aktiv filter → tilbake til "Alle"
+  if (activeFilter === filter && filter !== 'all') {
+    activeFilter = 'all';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.filter-btn:first-child').classList.add('active');
+  } else {
+    activeFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  let list = pokemon;
+  if (activeFilter === 'legendary') list = list.filter(p => p.legendary);
+  if (activeFilter === 'mythical')  list = list.filter(p => p.mythical);
+  if (q) list = list.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    (p.type1 && p.type1.toLowerCase().includes(q)) ||
+    (p.type2 && p.type2.toLowerCase().includes(q))
+  );
+  renderGrid(list);
+}
+
+// ─────────────────────────────────────────────────────
+//  DETAIL VIEW
+// ─────────────────────────────────────────────────────
+let currentDetailId = null;
+
+function showDetail(id) {
+  const mon = pokemon.find(p => p.id === id);
+  if (!mon) return;
+  currentDetailId = id;
+
+  // Image + forms toggle
+  const imgWrap = document.getElementById('d-img-wrap');
+  if (mon.forms) {
+    const formBtns = mon.forms.map((f,i) =>
+      `<button class="form-btn ${i===0?'active':''}" onclick="switchForm(${id},${i},this)">${f.label}</button>`
+    ).join('');
+    imgWrap.innerHTML = `
+      <img id="d-main-img" src="${mon.forms[0].img}" alt="${mon.name}" style="width:96%;max-width:460px;height:auto;aspect-ratio:1;object-fit:contain;display:block;" />
+      <div class="form-toggle">${formBtns}</div>`;
+  } else if (mon.img) {
+    imgWrap.innerHTML = `<img src="${mon.img}" alt="${mon.name}" style="width:96%;max-width:460px;height:auto;aspect-ratio:1;object-fit:contain;display:block;" />`;
+  } else {
+    imgWrap.innerHTML = `<div class="placeholder-img" style="width:260px;height:260px;font-size:3rem;border-radius:20px;margin:0 auto">?<span style="font-size:1rem;display:block">${padId(mon.id)}</span></div>`;
+  }
+
+  // Special label
+  const labelEl = document.getElementById('d-special-label');
+  if (mon.legendary) labelEl.innerHTML = '<span class="special-label legendary">Legendary</span>';
+  else if (mon.mythical) labelEl.innerHTML = '<span class="special-label mythical">Mythical</span>';
+  else labelEl.innerHTML = '';
+
+  // Card border
+  const card = document.getElementById('detail-card');
+  card.className = 'detail-card' + (mon.legendary ? ' is-legendary' : mon.mythical ? ' is-mythical' : '');
+
+  // Name / types
+  document.getElementById('d-num').textContent = padId(mon.id);
+  document.getElementById('d-name').textContent = mon.name;
+  document.getElementById('d-types').innerHTML = typeBadge(mon.type1) + typeBadge(mon.type2);
+
+  // Tab: Info
+  const descEl = document.getElementById('d-desc');
+  if (mon.description) {
+    descEl.textContent = mon.description;
+    descEl.classList.remove('placeholder');
+  } else {
+    descEl.textContent = 'Beskrivelse kommer snart...';
+    descEl.classList.add('placeholder');
+  }
+
+  // Tab: Moves
+  const movesEl = document.getElementById('d-moves');
+  if (mon.moves && mon.moves.length > 0) {
+    movesEl.innerHTML = mon.moves.map(m => `
+      <div class="move-row">
+        <span class="move-name">${m.name}</span>
+        <div class="move-meta">
+          <span class="type-badge ${typeClass(m.type)}">${m.type}</span>
+          <span class="move-pp">PP ${m.pp}</span>
+        </div>
+      </div>`).join('');
+  } else {
+    movesEl.innerHTML = `<div class="placeholder-row">Moves kommer snart...</div>`;
+  }
+
+  // Tab: Evolution
+  renderEvoChain(mon);
+
+  switchTab('info');
+  document.getElementById('pokedex-view').style.display = 'none';
+  document.getElementById('controls-section').style.display = 'none';
+  document.getElementById('detail-view').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function switchForm(monId, idx, btn) {
+  const mon = pokemon.find(p => p.id === monId);
+  if (!mon || !mon.forms) return;
+  document.getElementById('d-main-img').src = mon.forms[idx].img;
+  document.querySelectorAll('.form-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+}
+
+function renderEvoChain(mon) {
+  const evoEl = document.getElementById('d-evo-chain');
+  const stages = getEvoStages(mon);
+  if (stages.length <= 1 && stages[0].length <= 1 && !pokemon.find(p => stages[0].includes(p.evolvesFrom))) {
+    // Single mon, no chain
+    evoEl.innerHTML = '<div class="no-evo">Denne Pokémonen har ingen evolusjon.</div>';
+    return;
+  }
+  // Check if there's actually a chain (more than one stage, or multi-branch)
+  const hasChain = stages.length > 1 || stages.some(s => s.length > 1);
+  if (!hasChain) {
+    evoEl.innerHTML = '<div class="no-evo">Denne Pokémonen har ingen evolusjon.</div>';
+    return;
+  }
+  evoEl.innerHTML = stages.map((stage, stageIdx) => {
+    const monsInStage = stage.map(id => {
+      const m = pokemon.find(p => p.id === id);
+      if (!m) return '';
+      const isCurrent = m.id === mon.id;
+      const imgEl = m.img
+        ? `<img src="${m.img}" alt="${m.name}" />`
+        : `<div class="placeholder-img"></div>`;
+      return `<div class="evo-mon ${isCurrent ? 'current' : ''}" onclick="showDetail(${m.id})">${imgEl}<span class="name">${m.name}</span></div>`;
+    }).join('');
+    const arrow = stageIdx > 0 ? '<div class="evo-arrow">→</div>' : '';
+    return `${arrow}<div class="evo-row">${monsInStage}</div>`;
+  }).join('');
+}
+
+function showList() {
+  document.getElementById('pokedex-view').style.display = 'grid';
+  document.getElementById('controls-section').style.display = '';
+  document.getElementById('detail-view').style.display = 'none';
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', ['info','evolution','moves'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + name);
+  });
+}
+
+// ─────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────
+const inRegionCount = pokemon.filter(p => p.inRegion).length;
+document.getElementById('poke-count').textContent = `${inRegionCount} Pokémon i regionen`;
+renderGrid(pokemon);
+</script>
+</body>
+</html>
